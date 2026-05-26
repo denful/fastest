@@ -1,22 +1,19 @@
 { pkgs ? import <nixpkgs> {} }:
+let
+  runtimeInputs = with pkgs; [
+    bash
+    coreutils
+    jq
+    nix-eval-jobs
+    just
+  ];
+in
 {
   fastest = pkgs.writeShellApplication {
     name = "fastest";
     text = builtins.readFile ./fastest.bash;
-    runtimeInputs = with pkgs; [
-      nix
-      jq
-      nix-eval-jobs
-      nix-output-monitor
-    ];
+    inherit runtimeInputs;
   };
 
-  devShell = pkgs.mkShell {
-    buildInputs = with pkgs; [
-      nix
-      jq
-      nix-eval-jobs
-      shellcheck
-    ];
-  };
+  devShell = pkgs.mkShell { buildInputs = runtimeInputs; };
 }
