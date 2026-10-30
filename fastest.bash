@@ -190,6 +190,7 @@ fi
 # Construct suite prefix/suffix for output
 preSuite=""
 postSuite=""
+flake_mode=0
 if [[ -n "$suite" ]]; then
   preSuite=".${suite}"
   postSuite="${suite}."
@@ -281,6 +282,7 @@ if (( is_file_mode )); then
   jq -r 'select(.name != null and (.name | startswith("PASS-"))) | "✅ '"${postSuite}"'" + .attr' "$results"
 else
   # FLAKE MODE: nix-eval-jobs for parallel evaluation
+  flake_mode=1
   eval_args=(
     --flake "${ref}${preSuite}"
     --workers "$workers"
@@ -340,6 +342,14 @@ else
     echo >&2
     jq -r 'select(.error != null or (.name != null and (.name | startswith("FAIL-")))) | "❌ '"${postSuite}"'" + .attr' "$results" >&2
     echo >&2
+    # flake mode: nix-eval-jobs only names a failing test, so re-evaluate its expr and expected
+    if (( flake_mode )); then
+      jq -r 'select(.error != null or (.name != null and (.name | startswith("FAIL-")))) | .attr' "$results" | while read -r attr; do
+        [[ -n "$attr" ]] || continue
+        echo "FAILURE ${postSuite}${attr}" >&2
+        nix eval --json "${ref}${preSuite}.${attr}" >&2 || true
+      done
+    fi
   }
   echo "😢 ${pass}/${total} successful" >&2
   rm "$results" || true
